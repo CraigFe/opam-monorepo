@@ -63,18 +63,26 @@ end
 
 module Local_solver = Opam_0install.Solver.Make (Switch_and_local_packages_context)
 
-let calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~local_packages switch_state =
+let calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~local_packages ~versions switch_state
+    =
   let local_packages_names = OpamPackage.Name.Map.keys local_packages in
   let names_set = OpamPackage.Name.Set.of_list local_packages_names in
   let test = if build_only then OpamPackage.Name.Set.empty else names_set in
   let constraints =
-    let no_constraints = OpamPackage.Name.Map.empty in
+    ( OpamPackage.Name.Map.empty
+    |>
     match ocaml_version with
     | Some version ->
         let key = OpamPackage.Name.of_string "ocaml" in
         let value = (`Eq, OpamPackage.Version.of_string version) in
-        OpamPackage.Name.Map.safe_add key value no_constraints
-    | None -> no_constraints
+        OpamPackage.Name.Map.safe_add key value
+    | None -> fun x -> x )
+    |> fun init ->
+    List.fold_left versions ~init ~f:(fun map version ->
+        let pkg = OpamPackage.of_string version in
+        let key = OpamPackage.name pkg in
+        let value = (`Eq, OpamPackage.version pkg) in
+        OpamPackage.Name.Map.safe_add key value map)
   in
   let context =
     Switch_and_local_packages_context.create ~test ~allow_jbuilder ~constraints ~local_packages
@@ -101,10 +109,10 @@ let get_opam_info ~switch_state pkg =
 (* TODO catch exceptions and turn to error *)
 
 let calculate ~build_only ~allow_jbuilder ~local_opam_files ~local_packages ?ocaml_version
-    switch_state =
+    ?(versions = []) switch_state =
   let open Rresult.R.Infix in
   calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~local_packages:local_opam_files
-    switch_state
+    ~versions switch_state
   >>= fun deps ->
   Logs.app (fun l ->
       l "%aFound %a opam dependencies for the root package%a." Pp.Styled.header ()

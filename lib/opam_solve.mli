@@ -4,6 +4,7 @@ val calculate :
   local_opam_files:(OpamTypes.version * OpamFile.OPAM.t) OpamPackage.Name.Map.t ->
   local_packages:Types.Opam.package list ->
   ?ocaml_version:string ->
+  ?versions:string list ->
   OpamStateTypes.unlocked OpamStateTypes.switch_state ->
   (Opam.Package_summary.t list, [> `Msg of string ]) result
 (** Calculates a solution for the provided local packages and their opam files
