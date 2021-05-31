@@ -9,6 +9,8 @@
 
 - Exclude packages depending on `jbuilder` from the lock step. Since dune 2.0, `jbuild` files are
   not supported. A new `--allow-jbuilder` option have been added to enable the old behavior. 
+- Only print the full list of selected root packages once and only in verbose mode, simply printing
+  the number in the default logs. (#173, @NathanReb)
 
 ### Deprecated
 
