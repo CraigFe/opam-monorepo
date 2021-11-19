@@ -7,6 +7,7 @@ val calculate :
   target_packages:OpamPackage.Name.Set.t ->
   pin_depends:(OpamTypes.version * OpamFile.OPAM.t) OpamPackage.Name.Map.t ->
   ?ocaml_version:string ->
+  ?versions:string list ->
   OpamStateTypes.unlocked OpamStateTypes.switch_state ->
   ( Opam.Package_summary.t list,
     [> `Diagnostics of diagnostics | `Msg of string ] )

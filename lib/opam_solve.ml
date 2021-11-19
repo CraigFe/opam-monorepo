@@ -82,14 +82,21 @@ end
 module Local_solver =
   Opam_0install.Solver.Make (Switch_and_local_packages_context)
 
-let constraints ~ocaml_version =
+let constraints ~ocaml_version ~versions =
   let no_constraints = OpamPackage.Name.Map.empty in
-  match ocaml_version with
-  | Some version ->
-      let key = OpamPackage.Name.of_string "ocaml" in
-      let value = (`Eq, OpamPackage.Version.of_string version) in
-      OpamPackage.Name.Map.safe_add key value no_constraints
-  | None -> no_constraints
+  let ocaml_constraint =
+    match ocaml_version with
+    | Some version ->
+        let key = OpamPackage.Name.of_string "ocaml" in
+        let value = (`Eq, OpamPackage.Version.of_string version) in
+        OpamPackage.Name.Map.safe_add key value no_constraints
+    | None -> no_constraints
+  in
+  List.fold_left versions ~init:ocaml_constraint ~f:(fun map version ->
+      let pkg = OpamPackage.of_string version in
+      let key = OpamPackage.name pkg in
+      let value = (`Eq, OpamPackage.version pkg) in
+      OpamPackage.Name.Map.safe_add key value map)
 
 let request ~allow_compiler_variants local_packages_names =
   if allow_compiler_variants then local_packages_names
@@ -121,14 +128,14 @@ let fixed_packages ~local_packages ~pin_depends =
       "You have a locally defined package in a pin-depends field of another \
        locally defined package"
 
-let calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~local_packages
-    ~target_packages ~pin_depends switch_state =
+let calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~versions
+    ~local_packages ~target_packages ~pin_depends switch_state =
   let open Rresult.R.Infix in
   let target_packages_names = OpamPackage.Name.Set.elements target_packages in
   let install_test_deps_for =
     if build_only then OpamPackage.Name.Set.empty else target_packages
   in
-  let constraints = constraints ~ocaml_version in
+  let constraints = constraints ~ocaml_version ~versions in
   fixed_packages ~local_packages ~pin_depends >>= fun fixed_packages ->
   let context =
     Switch_and_local_packages_context.create ~install_test_deps_for
@@ -193,9 +200,9 @@ let get_opam_info ~pin_depends ~switch_state pkg =
 (* TODO catch exceptions and turn to error *)
 
 let calculate ~build_only ~allow_jbuilder ~local_opam_files ~target_packages
-    ~pin_depends ?ocaml_version switch_state =
+    ~pin_depends ?ocaml_version ?(versions = []) switch_state =
   let open Rresult.R.Infix in
-  calculate_raw ~build_only ~allow_jbuilder ~ocaml_version
+  calculate_raw ~build_only ~allow_jbuilder ~ocaml_version ~versions
     ~local_packages:local_opam_files ~target_packages ~pin_depends switch_state
   >>= fun deps ->
   Logs.app (fun l ->

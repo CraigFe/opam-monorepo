@@ -199,13 +199,13 @@ let interpret_solver_error ~switch_state = function
       Opam_solve.diagnostics_message ~verbose d
 
 let calculate_opam ~build_only ~allow_jbuilder ~local_opam_files ~ocaml_version
-    ~target_packages =
+    ~versions ~target_packages =
   let open Rresult.R.Infix in
   OpamGlobalState.with_ `Lock_none (fun global_state ->
       OpamSwitchState.with_ `Lock_none global_state (fun switch_state ->
           get_pin_depends ~global_state local_opam_files >>= fun pin_depends ->
           Opam_solve.calculate ~build_only ~allow_jbuilder ~local_opam_files
-            ~target_packages ~pin_depends ?ocaml_version switch_state
+            ~target_packages ~pin_depends ?ocaml_version ?versions switch_state
           |> Result.map_error ~f:(interpret_solver_error ~switch_state)))
 
 let select_explicitly_specified ~local_packages ~explicitly_specified =
@@ -310,7 +310,8 @@ let local_packages ~versions repo =
 
 let run (`Root root) (`Recurse_opam recurse) (`Build_only build_only)
     (`Allow_jbuilder allow_jbuilder) (`Ocaml_version ocaml_version)
-    (`Target_packages specified_packages) (`Lockfile explicit_lockfile) () =
+    (`Versions versions) (`Target_packages specified_packages)
+    (`Lockfile explicit_lockfile) () =
   let open Rresult.R.Infix in
   local_packages ~versions:specified_packages root >>= fun local_packages ->
   target_packages ~local_packages ~recurse
@@ -320,7 +321,7 @@ let run (`Root root) (`Recurse_opam recurse) (`Build_only build_only)
   local_paths_to_opam_map local_packages >>= fun opam_files ->
   lockfile_path ~explicit_lockfile ~target_packages root
   >>= fun lockfile_path ->
-  calculate_opam ~build_only ~allow_jbuilder ~ocaml_version
+  calculate_opam ~build_only ~allow_jbuilder ~ocaml_version ~versions
     ~local_opam_files:opam_files ~target_packages
   >>= fun package_summaries ->
   Common.Logs.app (fun l -> l "Calculating exact pins for each of them.");
@@ -390,6 +391,15 @@ let ocaml_version =
     (fun x -> `Ocaml_version x)
     Arg.(value & opt (some string) None & info ~doc [ "ocaml-version" ])
 
+let versions =
+  let doc =
+    "Comma-separated list of versions to lock with in the lockfile, e.g \
+     \"alcotest.1.4.0,conduit.2.3.0\""
+  in
+  Common.Arg.named
+    (fun x -> `Versions x)
+    Arg.(value & opt (some (list string)) None & info ~doc [ "versions" ])
+
 let info =
   let exits = Term.default_exits in
   let doc = Fmt.str "analyse opam files to generate a project-wide lock file" in
@@ -426,6 +436,7 @@ let term =
   let open Term in
   term_result
     (const run $ Common.Arg.root $ recurse_opam $ build_only $ allow_jbuilder
-   $ ocaml_version $ packages $ Common.Arg.lockfile $ Common.Arg.setup_logs ())
+   $ ocaml_version $ versions $ packages $ Common.Arg.lockfile
+   $ Common.Arg.setup_logs ())
 
 let cmd = (term, info)
